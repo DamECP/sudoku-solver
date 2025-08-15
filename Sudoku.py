@@ -1,5 +1,6 @@
 from itertools import combinations
 
+
 with open("sudoku_example.txt", "r") as example:
     sudoku_example = [line.strip() for line in example.readlines()]
 
@@ -22,37 +23,39 @@ class Space:
             return self.possibilities[0]
         return None
 
-    def update_row_col_square(self):
+    def naked_singles(self):
         """Easiest sudoku method : reduce possibilities for each cell
         based on what is already valid within the row, col, square."""
 
         row_col_square = ["row", "col", "square"]
 
-        progress = True
-        while progress:
-            progress = False
+        progress = False
 
-            for group in row_col_square:
+        for group in row_col_square:
 
-                validated_cells = {
-                    i.value
-                    for i in all_spaces
-                    if getattr(i, group) == getattr(self, group) and i.value is not None
-                }
-                current_cells = [
-                    i
-                    for i in all_spaces
-                    if getattr(i, group) == getattr(self, group) and i.value is None
-                ]
+            validated_cells = {
+                i.value
+                for i in all_spaces
+                if getattr(i, group) == getattr(self, group) and i.value is not None
+            }
+            current_cells = [
+                i
+                for i in all_spaces
+                if getattr(i, group) == getattr(self, group) and i.value is None
+            ]
 
-                for cell in current_cells:
+            for cell in current_cells:
 
-                    for value in validated_cells:
-                        if value in cell.possibilities:
-                            cell.possibilities.remove(value)
-                            progress = True
+                for value in validated_cells:
+                    if value in cell.possibilities:
+                        cell.possibilities.remove(value)
+                        progress = True
 
-    def reserved_spots(self, group):
+        return progress
+
+    def hidden_singles(self, group):
+
+        progress = False
 
         same = [
             space
@@ -69,11 +72,18 @@ class Space:
 
         if len(comparable) == len(self.possibilities):
             for item in others:
+                before = len(item.possibilities)
                 item.possibilities = list(
                     set(item.possibilities) - set(self.possibilities)
                 )
+                if len(item.possibilities) < before:
+                    progress = True
 
-    def hidden_method(self, group):
+        return progress
+
+    def hidden_ns(self, group):
+
+        progress = False
 
         for idx in range(1, 10):  # Will be used as an index for each row/col/square
 
@@ -85,7 +95,7 @@ class Space:
             ]
 
             # subset len to be tested
-            for subset_len in range(2, 9):
+            for subset_len in range(2, 5):
 
                 # all possible combinations of spaces depending on the subset length
                 for space_group in combinations(block, subset_len):
@@ -117,23 +127,17 @@ class Space:
                             # take this set out of the other spaces possibilities
                             for c in block:
                                 if c not in space_group:
-                                    c.possibilities = [
+                                    new_possibilities = [
                                         p
                                         for p in c.possibilities
                                         if p not in all_combinations
                                     ]
 
-    def resolve(self, rows, columns, squares):
+                                    if len(new_possibilities) != len(c.possibilities):
+                                        c.possibilities = new_possibilities
+                                        progress = True
 
-        n = 0
-
-        self.update_row_col_square()
-        for group in ["row", "col", "square"]:
-            self.reserved_spots(group)
-            self.update(rows, columns, squares)
-            self.hidden_method(group)
-            self.update(rows, columns, squares)
-            n += 1
+        return progress
 
 
 for i, row in enumerate(sudoku_example, 1):
@@ -181,6 +185,29 @@ for i, row in enumerate(sudoku_example, 1):
         all_spaces.append(s)
 
 
+def resolve_sudoku(max_passes=4):
+    progress = True
+    passes = 0
+    while progress and passes < max_passes:
+        progress = False
+        passes += 1
+        for group in ["row", "col", "square"]:
+            for space in all_spaces:
+                if space.naked_single():
+                    progress = True
+                if space.hidden_singles(group):
+                    progress = True
+                if space.hidden_ns(group):
+                    progress = True
+    if passes >= max_passes:
+        print(
+            f"⚠ Arrêt forcé après {max_passes} passes pour éviter une boucle infinie."
+        )
+
+
+resolve_sudoku()
+
+
 def print_sudoku():
     for i in range(1, 10):  # pour chaque ligne
         if i in [4, 7]:  # ligne de séparation horizontale
@@ -192,10 +219,6 @@ def print_sudoku():
             print(space.value if space.value else "x", end=" ")
         print()  # saut de ligne après chaque ligne
     print()
-    print(f"Nombre de passes : {n}")
 
 
 print_sudoku()
-
-
-# travailler la méthode resolve pour que ça bouce et implémenter un compteur pour limiter le nombre de passes et éviter une boucle infinie
