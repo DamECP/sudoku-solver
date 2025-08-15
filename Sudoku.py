@@ -22,23 +22,35 @@ class Space:
             return self.possibilities[0]
         return None
 
-    def reduce_by_line(self, rows):
-        if self.value is None:
-            for value in rows[self.row]:
-                if value in self.possibilities:
-                    self.possibilities.remove(value)
+    def update_row_col_square(self):
+        """Easiest sudoku method : reduce possibilities for each cell
+        based on what is already valid within the row, col, square."""
 
-    def reduce_by_column(self, columns):
-        if self.value is None:
-            for value in columns[self.col]:
-                if value in self.possibilities:
-                    self.possibilities.remove(value)
+        row_col_square = ["row", "col", "square"]
 
-    def reduce_by_square(self, squares):
-        if self.value is None:
-            for value in squares[self.square]:
-                if value in self.possibilities:
-                    self.possibilities.remove(value)
+        progress = True
+        while progress:
+            progress = False
+
+            for group in row_col_square:
+
+                validated_cells = {
+                    i.value
+                    for i in all_spaces
+                    if getattr(i, group) == getattr(self, group) and i.value is not None
+                }
+                current_cells = [
+                    i
+                    for i in all_spaces
+                    if getattr(i, group) == getattr(self, group) and i.value is None
+                ]
+
+                for cell in current_cells:
+
+                    for value in validated_cells:
+                        if value in cell.possibilities:
+                            cell.possibilities.remove(value)
+                            progress = True
 
     def reserved_spots(self, group):
 
@@ -61,30 +73,30 @@ class Space:
                     set(item.possibilities) - set(self.possibilities)
                 )
 
-    def hidden_method(self, rows):
+    def hidden_method(self, group):
 
         for idx in range(1, 10):  # Will be used as an index for each row/col/square
 
             # list of unknowns spaces within a row/col/square
             block = [
-                space for space in all_spaces if i.row == idx and space.value is None
+                space
+                for space in all_spaces
+                if getattr(space, group) == idx and space.value is None
             ]
 
             # subset len to be tested
-            for subset_len in range(2, 5):
+            for subset_len in range(2, 9):
 
                 # all possible combinations of spaces depending on the subset length
                 for space_group in combinations(block, subset_len):
 
-                    group_possibibilities = [space.possibilities for space in block]
-
                     # gather the possibilities as one specific set
                     # ex : {1, 4} + {2, 4} + {1, 2, 4} = {1, 2, 4}
                     all_combinations = set()
-                    for possibility in group_possibibilities:
-                        all_combinations.update(possibility)
+                    for space in space_group:
+                        all_combinations.update(space.possibilities)
 
-                    if len(group_possibibilities) == subset_len:
+                    if len(all_combinations) == subset_len:
 
                         # gather the spaces that correspond to the subset
                         processed_spaces = [
@@ -111,23 +123,17 @@ class Space:
                                         if p not in all_combinations
                                     ]
 
-    def update(self, rows, columns, squares):
-        if self.value:
-            if self.value not in rows[self.row]:
-                rows[self.row].append(self.value)
-            if self.value not in columns[self.col]:
-                columns[self.col].append(self.value)
-            if self.value not in squares[self.square]:
-                squares[self.square].append(self.value)
-
     def resolve(self, rows, columns, squares):
 
-        self.reduce_by_line(rows)
-        self.reduce_by_column(columns)
-        self.reduce_by_square(squares)
+        n = 0
+
+        self.update_row_col_square()
         for group in ["row", "col", "square"]:
             self.reserved_spots(group)
-        self.update(rows, columns, squares)
+            self.update(rows, columns, squares)
+            self.hidden_method(group)
+            self.update(rows, columns, squares)
+            n += 1
 
 
 for i, row in enumerate(sudoku_example, 1):
@@ -175,19 +181,6 @@ for i, row in enumerate(sudoku_example, 1):
         all_spaces.append(s)
 
 
-finished = False
-n = 0
-while not finished:
-    for space in all_spaces:
-        before = space.possibilities.copy()
-        space.resolve(rows, columns, squares)
-    n += 1
-    if all(space.value is not None for space in all_spaces):
-        finished = True
-    if n > 20:
-        break
-
-
 def print_sudoku():
     for i in range(1, 10):  # pour chaque ligne
         if i in [4, 7]:  # ligne de séparation horizontale
@@ -203,3 +196,6 @@ def print_sudoku():
 
 
 print_sudoku()
+
+
+# travailler la méthode resolve pour que ça bouce et implémenter un compteur pour limiter le nombre de passes et éviter une boucle infinie
