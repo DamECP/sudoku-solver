@@ -1,3 +1,5 @@
+from itertools import combinations
+
 with open("sudoku_example.txt", "r") as example:
     sudoku_example = [line.strip() for line in example.readlines()]
 
@@ -58,6 +60,56 @@ class Space:
                 item.possibilities = list(
                     set(item.possibilities) - set(self.possibilities)
                 )
+
+    def hidden_method(self, rows):
+
+        for idx in range(1, 10):  # Will be used as an index for each row/col/square
+
+            # list of unknowns spaces within a row/col/square
+            block = [
+                space for space in all_spaces if i.row == idx and space.value is None
+            ]
+
+            # subset len to be tested
+            for subset_len in range(2, 5):
+
+                # all possible combinations of spaces depending on the subset length
+                for space_group in combinations(block, subset_len):
+
+                    group_possibibilities = [space.possibilities for space in block]
+
+                    # gather the possibilities as one specific set
+                    # ex : {1, 4} + {2, 4} + {1, 2, 4} = {1, 2, 4}
+                    all_combinations = set()
+                    for possibility in group_possibibilities:
+                        all_combinations.update(possibility)
+
+                    if len(group_possibibilities) == subset_len:
+
+                        # gather the spaces that correspond to the subset
+                        processed_spaces = [
+                            space
+                            for space in block
+                            if any(
+                                poss in all_combinations for poss in space.possibilities
+                            )
+                        ]
+
+                        # ex : if 3 spaces share the values {1, 2, 4}
+                        if set(processed_spaces) == set(space_group):
+
+                            # limit the possibilities of that group to that set
+                            for space in space_group:
+                                space.possibilities = list(all_combinations)
+
+                            # take this set out of the other spaces possibilities
+                            for c in block:
+                                if c not in space_group:
+                                    c.possibilities = [
+                                        p
+                                        for p in c.possibilities
+                                        if p not in all_combinations
+                                    ]
 
     def update(self, rows, columns, squares):
         if self.value:
